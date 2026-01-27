@@ -1,0 +1,26 @@
+# Camera intrinsics matching the Gazebo model
+# 640x480, 80-degree horizontal FOV
+camera:
+  image_width: 640
+  image_height: 480
+  fx: 462.14
+  fy: 462.14
+  cx: 320.0
+  cy: 240.0
+  distortion_model: plumb_bob
+  distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+# Camera-IMU extrinsic transform (camera relative to IMU)
+# Translation: camera is 0.1m forward, 0.05m below IMU
+# Rotation: camera pitched 15 degrees down
+T_imu_camera:
+  translation: [0.1, 0.0, -0.05]
+  # Rotation as quaternion [x, y, z, w]
+  rotation: [0.0, 0.1305, 0.0, 0.9914]
+
+# IMU noise parameters (matching Gazebo sensor model)
+imu:
+  gyroscope_noise_density: 0.0003        # rad/s/sqrt(Hz)
+  gyroscope_random_walk: 0.00001         # rad/s^2/sqrt(Hz)
+  accelerometer_noise_density: 0.003     # m/s^2/sqrt(Hz)
+  accelerometer_random_walk: 0.0001      # m/s^3/sqrt(Hz)

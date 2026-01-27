@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# ROS 2 build artifacts
+log/
+install/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.csv
+*.bag
+*.db3
+
+# Virtual env
+venv/
+.venv/

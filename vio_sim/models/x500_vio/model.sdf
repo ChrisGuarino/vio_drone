@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="x500_vio">
+    <include>
+      <uri>model://x500</uri>
+    </include>
+
+    <!-- Forward-facing camera -->
+    <link name="camera_link">
+      <pose relative_to="base_link">0.1 0 -0.05 0 0.2618 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>1e-6</ixx><iyy>1e-6</iyy><izz>1e-6</izz>
+        </inertia>
+      </inertial>
+      <sensor name="camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>30</update_rate>
+        <topic>camera</topic>
+        <camera>
+          <horizontal_fov>1.3962634</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>100</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+          <lens>
+            <intrinsics>
+              <fx>462.14</fx>
+              <fy>462.14</fy>
+              <cx>320.0</cx>
+              <cy>240.0</cy>
+              <s>0</s>
+            </intrinsics>
+          </lens>
+        </camera>
+      </sensor>
+    </link>
+
+    <!-- IMU -->
+    <link name="imu_link">
+      <pose relative_to="base_link">0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>1e-6</ixx><iyy>1e-6</iyy><izz>1e-6</izz>
+        </inertia>
+      </inertial>
+      <sensor name="imu_sensor" type="imu">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <topic>imu</topic>
+        <imu>
+          <angular_velocity>
+            <x><noise><type>gaussian</type><mean>0</mean><stddev>0.0003</stddev></noise></x>
+            <y><noise><type>gaussian</type><mean>0</mean><stddev>0.0003</stddev></noise></y>
+            <z><noise><type>gaussian</type><mean>0</mean><stddev>0.0003</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise><type>gaussian</type><mean>0</mean><stddev>0.003</stddev></noise></x>
+            <y><noise><type>gaussian</type><mean>0</mean><stddev>0.003</stddev></noise></y>
+            <z><noise><type>gaussian</type><mean>0</mean><stddev>0.003</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>imu_link</child>
+    </joint>
+  </model>
+</sdf>

@@ -1,0 +1,9 @@
+# VIO Drone System - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+numpy>=1.24
+opencv-python>=4.8
+scipy>=1.10
+gtsam>=4.2
+transforms3d
+matplotlib
