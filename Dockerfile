@@ -46,7 +46,7 @@ RUN git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git /tmp/agent \
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
-    numpy>=1.24 \
+    "numpy>=1.24,<2" \
     opencv-python>=4.8 \
     scipy>=1.10 \
     gtsam>=4.2 \
@@ -67,6 +67,10 @@ COPY . /ros2_ws/src/vio_drone/
 # Build the workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build --symlink-install"
+
+# Source ROS 2 in every bash session (needed for docker exec)
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
+    echo "source /ros2_ws/install/setup.bash" >> /root/.bashrc
 
 # Setup entrypoint
 COPY docker-entrypoint.sh /docker-entrypoint.sh
