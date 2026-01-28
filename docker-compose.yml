@@ -1,12 +1,20 @@
 # VIO Drone System - Docker Compose
 #
 # Usage:
-#   docker compose build        # Build the image
-#   docker compose up -d        # Start containers in background
-#   docker compose exec vio bash  # Open shell in container
-#   docker compose down         # Stop everything
+#   docker compose build              # Build all images
+#   docker compose up -d              # Start all containers
+#   docker compose up px4_gz          # Start PX4 + Gazebo only (needs GPU)
+#   docker compose exec vio bash      # Open shell in VIO container
+#   docker compose down               # Stop everything
+#
+# Full pipeline (Linux + NVIDIA GPU):
+#   docker compose up px4_gz -d       # Start Gazebo with GPU rendering
+#   docker compose exec vio bash      # Then launch VIO nodes inside
 
 services:
+  # ──────────────────────────────────────────────
+  # VIO Pipeline (frontend, backend, bridge, eval)
+  # ──────────────────────────────────────────────
   vio:
     build:
       context: .
@@ -32,12 +40,46 @@ services:
     environment:
       - DISPLAY=${DISPLAY:-:0}
       - ROS_DOMAIN_ID=0
-      # For GUI apps (rviz, gazebo)
       - QT_X11_NO_MITSHM=1
 
-    # For GUI on macOS (requires XQuartz)
-    # volumes:
-    #   - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  # ──────────────────────────────────────────────
+  # PX4 SITL + Gazebo (requires Linux + NVIDIA GPU)
+  # ──────────────────────────────────────────────
+  px4_gz:
+    build:
+      context: .
+      dockerfile: Dockerfile.px4
+    container_name: px4_gazebo
+
+    stdin_open: true
+    tty: true
+
+    # Share network with VIO container for DDS topic discovery
+    network_mode: host
+
+    # GUI + GPU environment
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - PX4_SIM_MODEL=gz_x500
+      - PX4_GZ_WORLD=default
+
+    volumes:
+      # X11 socket for Gazebo GUI display
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Custom drone models
+      - ./vio_sim/models:/PX4-Autopilot/Tools/simulation/gz/models/custom:ro
+      # Custom worlds
+      - ./vio_sim/worlds:/PX4-Autopilot/Tools/simulation/gz/worlds/custom:ro
+
+    # NVIDIA GPU access (requires nvidia-container-toolkit on host)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 # Named volumes for build persistence
 volumes:

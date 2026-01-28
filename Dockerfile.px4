@@ -1,0 +1,36 @@
+# PX4 SITL + Gazebo Garden - Docker Image
+# Requires NVIDIA GPU + nvidia-container-toolkit on host
+#
+# Usage:
+#   docker compose up px4_gz
+#   # Gazebo window will open with the X500 drone
+
+FROM px4io/px4-dev-simulation-jammy
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Gazebo Garden
+RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/gazebo-stable.list \
+    && apt-get update && apt-get install -y \
+    gz-garden \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone and build PX4-Autopilot
+RUN git clone --depth 1 --recurse-submodules https://github.com/PX4/PX4-Autopilot.git /PX4-Autopilot
+
+WORKDIR /PX4-Autopilot
+
+# Build PX4 SITL (this takes a while but is cached)
+RUN make px4_sitl_default
+
+# Copy the custom VIO drone model
+COPY vio_sim/models/x500_vio /PX4-Autopilot/Tools/simulation/gz/models/x500_vio
+
+# Entrypoint: start PX4 SITL with Gazebo
+COPY docker-entrypoint-px4.sh /docker-entrypoint-px4.sh
+RUN chmod +x /docker-entrypoint-px4.sh
+
+ENTRYPOINT ["/docker-entrypoint-px4.sh"]
+CMD ["make", "px4_sitl", "gz_x500"]
