@@ -134,6 +134,7 @@ Passive observer that compares VIO estimates to ground truth. No effect on the p
 **Key files:**
 - `models/x500_vio/model.sdf` — Gazebo drone model with camera and IMU
 - `config/camera_params.yaml` — Camera intrinsics and extrinsics
+- `worlds/default.sdf` — Gazebo world with ground plane and visual landmarks
 - `launch/full_system_launch.py` — Orchestrates all nodes
 
 ---
@@ -145,38 +146,21 @@ Passive observer that compares VIO estimates to ground truth. No effect on the p
 Docker provides a consistent environment with all dependencies pre-installed.
 
 **Prerequisites:**
-- Docker Desktop
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- For GPU simulation: Linux host with NVIDIA GPU + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-**Build and run:**
+**Build the images:**
 
 ```bash
-# Build the image (first time takes 10-15 minutes)
+git clone https://github.com/ChrisGuarino/vio_drone.git
+cd vio_drone
+
+# Build VIO image only (works on any OS)
+docker compose build vio
+
+# Build both VIO + PX4/Gazebo images (Linux + NVIDIA GPU)
 docker compose build
-
-# Start the container
-docker compose up -d
-
-# Open a shell inside
-docker compose exec vio bash
-
-# Inside the container, rebuild if needed:
-cd /ros2_ws
-colcon build --symlink-install
-source install/setup.bash
-
-# Stop when done
-docker compose down
 ```
-
-**Docker files:**
-| File | Purpose |
-|------|---------|
-| `Dockerfile` | Builds image with ROS 2 Humble, GTSAM, OpenCV, px4_msgs |
-| `docker-entrypoint.sh` | Sources ROS 2 on container start |
-| `docker-compose.yml` | Orchestrates container with volume mounts for live editing |
-| `.dockerignore` | Excludes unnecessary files from image build |
-
-Your source code is mounted as a volume — edits on your host sync instantly to the container.
 
 ### Option B: Native Installation
 
@@ -189,10 +173,10 @@ Your source code is mounted as a volume — edits on your host sync instantly to
 
 **Python dependencies:**
 ```
-numpy >= 1.24
-opencv-python >= 4.8
-scipy >= 1.10
-gtsam >= 4.2
+numpy>=1.24,<2
+opencv-python>=4.8
+scipy>=1.10
+gtsam>=4.2
 transforms3d
 matplotlib
 ```
@@ -215,24 +199,76 @@ source install/setup.bash
 
 ## Running the System
 
-### Terminal 1 — PX4 SITL + Gazebo
+### Docker with GPU (Full Pipeline)
+
+Requires a Linux host with an NVIDIA GPU and `nvidia-container-toolkit` installed.
 
 ```bash
-cd ~/PX4-Autopilot
-make px4_sitl gz_x500
-```
+# Allow Docker to access the display (for Gazebo GUI)
+xhost +local:docker
 
-### Terminal 2 — VIO System
+# Terminal 1 — Start PX4 SITL + Gazebo (GPU-accelerated)
+docker compose up px4_gz
 
-```bash
-# If using Docker:
+# Terminal 2 — Start VIO pipeline
+docker compose up -d vio
 docker compose exec vio bash
-
-# Then:
+source /opt/ros/humble/setup.bash
+source /ros2_ws/install/setup.bash
 ros2 launch vio_sim full_system_launch.py
 ```
 
-This launches the full pipeline: uXRCE-DDS agent, Gazebo-ROS bridge, frontend, backend, PX4 bridge, and evaluation node.
+**What happens:**
+1. `px4_gz` container starts Gazebo with the X500 drone, publishing camera + IMU topics
+2. `vio` container picks up those topics via shared host network (DDS)
+3. The VIO pipeline processes the data and sends odometry back to PX4's EKF2
+
+### Docker without GPU (VIO Only)
+
+Works on any OS. Useful for development, testing node startup, and verifying builds. Nodes will start but idle without sensor data.
+
+```bash
+# Start VIO container
+docker compose up -d vio
+
+# Open a shell
+docker compose exec vio bash
+source /opt/ros/humble/setup.bash
+source /ros2_ws/install/setup.bash
+
+# Launch VIO nodes (will wait for sensor data)
+ros2 launch vio_sim full_system_launch.py
+
+# Or run individual nodes for testing
+ros2 run vio_frontend frontend_node
+ros2 run vio_backend backend_node
+```
+
+### Native (No Docker)
+
+```bash
+# Terminal 1 — PX4 SITL + Gazebo
+cd ~/PX4-Autopilot
+make px4_sitl gz_x500
+
+# Terminal 2 — VIO System
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 launch vio_sim full_system_launch.py
+```
+
+### Docker Cheat Sheet
+
+| Command | What it does |
+|---------|-------------|
+| `docker compose build` | Build all images |
+| `docker compose build vio` | Build VIO image only |
+| `docker compose up -d` | Start all containers in background |
+| `docker compose up px4_gz` | Start PX4 + Gazebo (foreground) |
+| `docker compose exec vio bash` | Open shell in VIO container |
+| `docker compose down` | Stop and remove all containers |
+| `docker compose logs -f` | Follow container logs |
+| `docker ps` | List running containers |
 
 ### Launch Arguments
 
@@ -271,36 +307,39 @@ ros2 launch vio_sim full_system_launch.py max_features:=200 window_size:=15
 
 ```
 vio_drone/
-├── vio_interfaces/           # Custom ROS 2 message definitions
+├── vio_interfaces/               # Custom ROS 2 message definitions
 │   └── msg/
 │       ├── TrackedFeatures.msg
 │       └── VioState.msg
-├── vio_frontend/             # Visual feature tracking
+├── vio_frontend/                 # Visual feature tracking
 │   └── vio_frontend/
 │       └── frontend_node.py
-├── vio_backend/              # State estimation
+├── vio_backend/                  # State estimation
 │   └── vio_backend/
-│       ├── backend_node.py       # Main orchestrator
-│       ├── initializer.py        # Static initialization
-│       ├── imu_preintegrator.py  # IMU buffering & preintegration
-│       └── state_estimator.py    # GTSAM factor graph
-├── vio_bridge/               # ROS 2 ↔ PX4 coordinate conversion
+│       ├── backend_node.py           # Main orchestrator
+│       ├── initializer.py            # Static initialization
+│       ├── imu_preintegrator.py      # IMU buffering & preintegration
+│       └── state_estimator.py        # GTSAM factor graph
+├── vio_bridge/                   # ROS 2 ↔ PX4 coordinate conversion
 │   └── vio_bridge/
 │       └── bridge_node.py
-├── vio_eval/                 # Trajectory evaluation
+├── vio_eval/                     # Trajectory evaluation
 │   └── vio_eval/
 │       └── eval_node.py
-├── vio_sim/                  # Simulation environment
+├── vio_sim/                      # Simulation environment
 │   ├── launch/
 │   │   ├── full_system_launch.py
 │   │   └── sim_launch.py
 │   ├── models/x500_vio/
 │   ├── config/
 │   └── worlds/
-├── Dockerfile                # Docker image definition
-├── docker-compose.yml        # Container orchestration
-├── docker-entrypoint.sh      # Container startup script
-├── requirements.txt          # Python dependencies
+├── Dockerfile                    # VIO image (ROS 2 + GTSAM + OpenCV)
+├── Dockerfile.px4                # PX4 + Gazebo image (NVIDIA GPU)
+├── docker-compose.yml            # Multi-container orchestration
+├── docker-entrypoint.sh          # VIO container startup script
+├── docker-entrypoint-px4.sh      # PX4 container startup script
+├── .dockerignore                 # Files excluded from Docker build
+├── requirements.txt              # Python dependencies
 └── README.md
 ```
 
