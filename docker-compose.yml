@@ -1,0 +1,46 @@
+# VIO Drone System - Docker Compose
+#
+# Usage:
+#   docker compose build        # Build the image
+#   docker compose up -d        # Start containers in background
+#   docker compose exec vio bash  # Open shell in container
+#   docker compose down         # Stop everything
+
+services:
+  vio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vio_drone
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Mount your source code for live editing
+    volumes:
+      - .:/ros2_ws/src/vio_drone:rw
+      # Persist build artifacts
+      - vio_build:/ros2_ws/build
+      - vio_install:/ros2_ws/install
+      - vio_log:/ros2_ws/log
+
+    # Network settings for ROS 2 DDS discovery
+    network_mode: host
+
+    # Environment
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DOMAIN_ID=0
+      # For GUI apps (rviz, gazebo)
+      - QT_X11_NO_MITSHM=1
+
+    # For GUI on macOS (requires XQuartz)
+    # volumes:
+    #   - /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+# Named volumes for build persistence
+volumes:
+  vio_build:
+  vio_install:
+  vio_log:

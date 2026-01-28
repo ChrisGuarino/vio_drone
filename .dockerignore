@@ -1,0 +1,12 @@
+# Don't copy these into the Docker image
+.git
+*.pyc
+__pycache__
+*.egg-info
+build/
+install/
+log/
+venv/
+.vscode/
+*.bag
+*.db3
